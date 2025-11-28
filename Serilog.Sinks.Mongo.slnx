@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Build/">
+    <File Path=".github/workflows/dotnet.yml" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+    <File Path="src/Directory.Build.props" />
+  </Folder>
+  <Project Path="src/Serilog.Sinks.Mongo/Serilog.Sinks.Mongo.csproj" Id="78c7d6b6-65e1-4b1b-9047-ec489d073dda" />
+  <Project Path="test/Serilog.Sinks.Mongo.Sample/Serilog.Sinks.Mongo.Sample.csproj" Id="0e13ccd2-abae-437f-a735-de178f0453cd" />
+  <Project Path="test/Serilog.Sinks.Mongo.Tests/Serilog.Sinks.Mongo.Tests.csproj" Id="d6a4c3f5-d563-4cfc-b74b-4c8153050cc7" />
+</Solution>

@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "sample.timed": {
+      "commandName": "Project",
+      "commandLineArgs": "timed"
+    },
+    "sample.capped": {
+      "commandName": "Project",
+      "commandLineArgs": "capped"
+    },
+    "sample.config": {
+      "commandName": "Project",
+      "commandLineArgs": "config"
+    }
+  }
+}
