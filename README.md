@@ -189,20 +189,20 @@ Log.Logger = new LoggerConfiguration()
 
 ### MongoSinkOptions
 
-| Property             | Type                      | Default             | Description                                 |
-| -------------------- | ------------------------- | ------------------- | ------------------------------------------- |
-| `ConnectionString`   | `string`                  | -                   | MongoDB connection string                   |
-| `MongoUrl`           | `MongoUrl`                | -                   | Alternative to ConnectionString             |
-| `DatabaseName`       | `string`                  | `"serilog"`         | Database name                               |
-| `CollectionName`     | `string`                  | `"logs"`            | Collection name                             |
-| `MinimumLevel`       | `LogEventLevel`           | `Verbose`           | Minimum log level to write                  |
-| `ExpireAfter`        | `TimeSpan?`               | -                   | TTL for automatic document expiration       |
-| `BatchSizeLimit`     | `int`                     | `100`               | Maximum batch size                          |
-| `BufferingTimeLimit` | `TimeSpan`                | `00:00:02`          | Maximum time to wait before writing a batch |
-| `CollectionOptions`  | `CreateCollectionOptions` | -                   | MongoDB collection creation options         |
-| `Properties`         | `HashSet<string>`         | `{"SourceContext"}` | Properties to promote to top-level          |
-| `DocumentFactory`    | `IDocumentFactory`        | -                   | Custom document factory                     |
-| `MongoFactory`       | `IMongoFactory`           | -                   | Custom MongoDB factory                      |
+| Property             | Default             | Description                                 |
+| -------------------- | ------------------- | ------------------------------------------- |
+| `ConnectionString`   | -                   | MongoDB connection string                   |
+| `MongoUrl`           | -                   | Alternative to ConnectionString             |
+| `DatabaseName`       | `"serilog"`         | Database name                               |
+| `CollectionName`     | `"logs"`            | Collection name                             |
+| `MinimumLevel`       | `Verbose`           | Minimum log level to write                  |
+| `ExpireAfter`        | -                   | TTL for automatic document expiration       |
+| `BatchSizeLimit`     | `100`               | Maximum batch size                          |
+| `BufferingTimeLimit` | `00:00:02`          | Maximum time to wait before writing a batch |
+| `CollectionOptions`  | -                   | MongoDB collection creation options         |
+| `Properties`         | `{"SourceContext"}` | Properties to promote to top-level          |
+| `DocumentFactory`    | -                   | Custom document factory                     |
+| `MongoFactory`       | -                   | Custom MongoDB factory                      |
 
 ## Document Structure
 
