@@ -6,8 +6,34 @@ using Serilog.Events;
 
 namespace Serilog.Sinks.Mongo;
 
+/// <summary>
+/// Default implementation of <see cref="IDocumentFactory"/> that converts Serilog log events to BSON documents for MongoDB storage.
+/// </summary>
 public class DocumentFactory : IDocumentFactory
 {
+    /// <summary>
+    /// Creates a BSON document from a Serilog log event.
+    /// </summary>
+    /// <param name="logEvent">The Serilog log event to convert.</param>
+    /// <param name="options">The MongoDB sink options that control document creation.</param>
+    /// <returns>
+    /// A BSON document containing the log event data, or <c>null</c> if the log event should not be persisted
+    /// (e.g., when the log level is below the minimum level or the log event is null).
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is <c>null</c>.</exception>
+    /// <remarks>
+    /// The created document includes:
+    /// <list type="bullet">
+    /// <item><description>Timestamp - The UTC timestamp of the log event</description></item>
+    /// <item><description>Level - The log level (Verbose, Debug, Information, Warning, Error, Fatal)</description></item>
+    /// <item><description>Message - The rendered log message</description></item>
+    /// <item><description>TraceId - The distributed trace ID (if available)</description></item>
+    /// <item><description>SpanId - The span ID for distributed tracing (if available)</description></item>
+    /// <item><description>Exception - Detailed exception information (if an exception is present)</description></item>
+    /// <item><description>Properties - Additional log event properties</description></item>
+    /// <item><description>Promoted properties - Properties configured to appear at the document root level</description></item>
+    /// </list>
+    /// </remarks>
     public virtual BsonDocument? CreateDocument(LogEvent logEvent, MongoSinkOptions options)
     {
         if (logEvent == null)
@@ -47,6 +73,16 @@ public class DocumentFactory : IDocumentFactory
         return document;
     }
 
+    /// <summary>
+    /// Promotes configured properties from the log event to the top level of the BSON document.
+    /// </summary>
+    /// <param name="logEvent">The log event containing properties to promote.</param>
+    /// <param name="options">The sink options specifying which properties to promote.</param>
+    /// <param name="document">The BSON document to add promoted properties to.</param>
+    /// <remarks>
+    /// Properties are promoted based on the <see cref="MongoSinkOptions.Properties"/> collection.
+    /// Property names are sanitized to comply with MongoDB field name restrictions.
+    /// </remarks>
     private static void PromoteProperties(LogEvent logEvent, MongoSinkOptions options, BsonDocument document)
     {
         if (options.Properties == null)
@@ -62,6 +98,18 @@ public class DocumentFactory : IDocumentFactory
         }
     }
 
+    /// <summary>
+    /// Creates a BSON document from a collection of log event properties.
+    /// </summary>
+    /// <param name="properties">The log event properties to convert.</param>
+    /// <param name="ignored">Optional set of property names to exclude from the document.</param>
+    /// <returns>
+    /// A BSON document containing the properties, or <c>null</c> if there are no properties to include.
+    /// </returns>
+    /// <remarks>
+    /// Properties in the <paramref name="ignored"/> set are excluded from the result.
+    /// This is typically used to exclude properties that have been promoted to the document root level.
+    /// </remarks>
     private static BsonDocument? CreateProperties(IReadOnlyDictionary<string, LogEventPropertyValue> properties, HashSet<string>? ignored = null)
     {
         if (properties == null || properties.Count == 0)
@@ -85,6 +133,29 @@ public class DocumentFactory : IDocumentFactory
         return document;
     }
 
+    /// <summary>
+    /// Creates a BSON document from an exception.
+    /// </summary>
+    /// <param name="exception">The exception to convert.</param>
+    /// <returns>
+    /// A BSON document containing detailed exception information, or <c>null</c> if the exception is <c>null</c>.
+    /// </returns>
+    /// <remarks>
+    /// The exception document includes:
+    /// <list type="bullet">
+    /// <item><description>Message - The exception message</description></item>
+    /// <item><description>BaseMessage - The base exception message</description></item>
+    /// <item><description>Type - The exception type name</description></item>
+    /// <item><description>Text - The full exception string representation</description></item>
+    /// <item><description>HResult - The exception HRESULT code</description></item>
+    /// <item><description>ErrorCode - The error code (for ExternalException)</description></item>
+    /// <item><description>Source - The exception source</description></item>
+    /// <item><description>MethodName - The method where the exception occurred</description></item>
+    /// <item><description>ModuleName - The assembly name</description></item>
+    /// <item><description>ModuleVersion - The assembly version</description></item>
+    /// </list>
+    /// AggregateExceptions are flattened, and single inner exceptions are unwrapped.
+    /// </remarks>
     private static BsonDocument? CreateException(Exception? exception)
     {
         if (exception == null)
@@ -134,6 +205,20 @@ public class DocumentFactory : IDocumentFactory
         return document;
     }
 
+    /// <summary>
+    /// Converts a Serilog property value to a BSON value.
+    /// </summary>
+    /// <param name="propertyValue">The Serilog property value to convert.</param>
+    /// <returns>A BSON value representation of the property value.</returns>
+    /// <remarks>
+    /// Handles the following Serilog property types:
+    /// <list type="bullet">
+    /// <item><description>ScalarValue - Converted to appropriate BSON types</description></item>
+    /// <item><description>SequenceValue - Converted to BsonArray</description></item>
+    /// <item><description>StructureValue - Converted to nested BsonDocument</description></item>
+    /// <item><description>DictionaryValue - Converted to BsonDocument</description></item>
+    /// </list>
+    /// </remarks>
     private static BsonValue? ConvertProperty(LogEventPropertyValue propertyValue)
     {
         return propertyValue switch
@@ -146,6 +231,22 @@ public class DocumentFactory : IDocumentFactory
         };
     }
 
+    /// <summary>
+    /// Converts a Serilog scalar value to a BSON value.
+    /// </summary>
+    /// <param name="scalarValue">The scalar value to convert.</param>
+    /// <returns>A BSON value representation of the scalar value.</returns>
+    /// <remarks>
+    /// Provides special handling for:
+    /// <list type="bullet">
+    /// <item><description>Guid - Stored as BsonBinaryData</description></item>
+    /// <item><description>DateTimeOffset - Converted to UTC DateTime</description></item>
+    /// <item><description>TimeSpan - Stored as string</description></item>
+    /// <item><description>DateOnly - Converted to BsonDateTime (.NET 6+)</description></item>
+    /// <item><description>TimeOnly - Stored as ISO 8601 string (.NET 6+)</description></item>
+    /// </list>
+    /// For unsupported types, falls back to string representation.
+    /// </remarks>
     private static BsonValue ConvertScalarValue(ScalarValue scalarValue)
     {
         if (scalarValue.Value == null)
@@ -165,6 +266,16 @@ public class DocumentFactory : IDocumentFactory
         };
     }
 
+    /// <summary>
+    /// Safely creates a BSON value from an object, with fallback to string representation.
+    /// </summary>
+    /// <param name="value">The object to convert to BSON.</param>
+    /// <returns>A BSON value, or a string representation if the type is not directly supported.</returns>
+    /// <remarks>
+    /// Attempts to use <see cref="BsonValue.Create"/> first. If that fails with an <see cref="ArgumentException"/>,
+
+    /// falls back to storing the value's string representation.
+    /// </remarks>
     private static BsonValue CreateBsonValueSafe(object value)
     {
         try
@@ -178,6 +289,15 @@ public class DocumentFactory : IDocumentFactory
         }
     }
 
+    /// <summary>
+    /// Converts a Serilog log event level to its string representation.
+    /// </summary>
+    /// <param name="level">The log event level to convert.</param>
+    /// <returns>The string name of the log level.</returns>
+    /// <remarks>
+    /// Provides optimized conversion for all standard Serilog log levels.
+    /// Unknown levels default to "Verbose".
+    /// </remarks>
     private static string ConvertLevel(LogEventLevel level)
     {
         // fast path for common levels
@@ -193,6 +313,20 @@ public class DocumentFactory : IDocumentFactory
         };
     }
 
+    /// <summary>
+    /// Sanitizes a property name to comply with MongoDB field name restrictions.
+    /// </summary>
+    /// <param name="name">The property name to sanitize.</param>
+    /// <returns>A sanitized property name safe for use as a MongoDB field name.</returns>
+    /// <remarks>
+    /// MongoDB field names cannot contain:
+    /// <list type="bullet">
+    /// <item><description>Dot (.) - Reserved for nested field access</description></item>
+    /// <item><description>Dollar sign ($) - Reserved for operators</description></item>
+    /// <item><description>Control characters - Including null characters</description></item>
+    /// </list>
+    /// Invalid characters are replaced with underscores. Empty or null names are replaced with "_".
+    /// </remarks>
     private static string SanitizePropertyName(string name)
     {
         if (string.IsNullOrEmpty(name))
