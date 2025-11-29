@@ -273,7 +273,6 @@ public class DocumentFactory : IDocumentFactory
     /// <returns>A BSON value, or a string representation if the type is not directly supported.</returns>
     /// <remarks>
     /// Attempts to use <see cref="BsonValue.Create"/> first. If that fails with an <see cref="ArgumentException"/>,
-
     /// falls back to storing the value's string representation.
     /// </remarks>
     private static BsonValue CreateBsonValueSafe(object value)
