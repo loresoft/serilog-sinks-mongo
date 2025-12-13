@@ -144,13 +144,21 @@ public class MongoFactory : IMongoFactory
     /// </remarks>
     private static async Task EnsureCollectionExists(MongoSinkOptions options, IMongoDatabase database, IMongoCollection<BsonDocument> collection)
     {
-        var collectionList = await database.ListCollectionNamesAsync();
-        var collections = await collectionList.ToListAsync();
+        try
+        {
+            var collectionList = await database.ListCollectionNamesAsync();
+            var collections = await collectionList.ToListAsync();
 
-        if (collections.Contains(collection.CollectionNamespace.CollectionName))
-            return;
+            if (collections.Contains(collection.CollectionNamespace.CollectionName))
+                return;
 
-        await database.CreateCollectionAsync(collection.CollectionNamespace.CollectionName, options.CollectionOptions);
+            await database.CreateCollectionAsync(collection.CollectionNamespace.CollectionName, options.CollectionOptions);
+        }
+        catch (Exception ex)
+        {
+            // don't fail due to collection creation issues, MongoDB supports auto creation itself
+            SelfLog.WriteLine("Error while creating collection: {0}", ex.Message);
+        }
     }
 
     /// <summary>
@@ -180,26 +188,34 @@ public class MongoFactory : IMongoFactory
         if (expireAfter == null)
             return;
 
-        // Get existing indexes
-        var existingIndexesCursor = await mongoCollection.Indexes.ListAsync();
-        var existingIndexes = await existingIndexesCursor.ToListAsync();
-        var existingIndexNames = existingIndexes
-            .Select(idx => idx.GetValue("name", BsonNull.Value).AsString)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .ToHashSet();
+        try
+        {
+            // Get existing indexes
+            var existingIndexesCursor = await mongoCollection.Indexes.ListAsync();
+            var existingIndexes = await existingIndexesCursor.ToListAsync();
+            var existingIndexNames = existingIndexes
+                .Select(idx => idx.GetValue("name", BsonNull.Value).AsString)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .ToHashSet();
 
-        // Check if timestamp index exists
-        var timestampIndexName = $"{MongoSinkDefaults.Timestamp}_-1";
-        if (existingIndexNames.Contains(timestampIndexName))
-            return;
+            // Check if timestamp index exists
+            var timestampIndexName = $"{MongoSinkDefaults.Timestamp}_-1";
+            if (existingIndexNames.Contains(timestampIndexName))
+                return;
 
-        var indexKeys = Builders<BsonDocument>.IndexKeys;
-        var timeIndex = new CreateIndexModel<BsonDocument>(
-            keys: indexKeys.Descending(MongoSinkDefaults.Timestamp),
-            options: new CreateIndexOptions { Name = timestampIndexName, ExpireAfter = expireAfter }
-        );
+            var indexKeys = Builders<BsonDocument>.IndexKeys;
+            var timeIndex = new CreateIndexModel<BsonDocument>(
+                keys: indexKeys.Descending(MongoSinkDefaults.Timestamp),
+                options: new CreateIndexOptions { Name = timestampIndexName, ExpireAfter = expireAfter }
+            );
 
-        // Create the index
-        await mongoCollection.Indexes.CreateOneAsync(timeIndex);
+            // Create the index
+            await mongoCollection.Indexes.CreateOneAsync(timeIndex);
+        }
+        catch (Exception ex)
+        {
+            // don't fail due to index creation issues, indexes not required for logging to function
+            SelfLog.WriteLine("Error while creating indexes: {0}", ex.Message);
+        }
     }
 }
