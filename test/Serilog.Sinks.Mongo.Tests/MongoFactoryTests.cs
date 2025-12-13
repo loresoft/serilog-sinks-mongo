@@ -308,7 +308,7 @@ public class MongoFactoryTests(DatabaseFixture databaseFixture) : DatabaseTestBa
     }
 
     [Fact]
-    public async Task GetCollection_WhenCollectionDoesNotExist_ShouldCreateCollection()
+    public async Task GetCollection_WhenCollectionDoesNotExist_ShouldNotCreateCollectionWithoutOptions()
     {
         // Arrange
         var connectionString = Fixture.GetConnectionString();
@@ -327,41 +327,20 @@ public class MongoFactoryTests(DatabaseFixture databaseFixture) : DatabaseTestBa
         // Assert
         collection.Should().NotBeNull();
 
-        // Verify collection was created
+        // Verify collection was NOT created (no CollectionOptions specified, so auto-creation on write)
         var database = collection.Database;
         var collectionList = await database.ListCollectionNamesAsync(cancellationToken: TestCancellation);
         var collections = await collectionList.ToListAsync(cancellationToken: TestCancellation);
-        collections.Should().Contain(uniqueCollectionName);
-    }
-
-    [Fact]
-    public async Task GetCollection_WhenCollectionExists_ShouldNotRecreateCollection()
-    {
-        // Arrange
-        var connectionString = Fixture.GetConnectionString();
-        var uniqueCollectionName = $"ExistingCollection_{Guid.NewGuid():N}";
-        var options = new MongoSinkOptions
-        {
-            ConnectionString = connectionString,
-            DatabaseName = "MongFactoryTests",
-            CollectionName = uniqueCollectionName
-        };
-        var factory = new MongoFactory();
-
-        // Create collection first time
-        var collection1 = await factory.GetCollection(options);
-
-        // Insert a test document
+        collections.Should().NotContain(uniqueCollectionName);
+        
+        // Insert a document to trigger auto-creation
         var testDocument = new BsonDocument { { "test", "value" }, { "Timestamp", DateTime.UtcNow } };
-        await collection1.InsertOneAsync(testDocument, cancellationToken: TestCancellation);
-
-        // Act - get collection again
-        var collection2 = await factory.GetCollection(options);
-
-        // Assert - should be same collection with existing data
-        collection2.Should().BeSameAs(collection1);
-        var count = await collection2.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: TestCancellation);
-        count.Should().BeGreaterThanOrEqualTo(1);
+        await collection.InsertOneAsync(testDocument, cancellationToken: TestCancellation);
+        
+        // Now verify collection exists after write
+        collectionList = await database.ListCollectionNamesAsync(cancellationToken: TestCancellation);
+        collections = await collectionList.ToListAsync(cancellationToken: TestCancellation);
+        collections.Should().Contain(uniqueCollectionName);
     }
 
     [Fact]
@@ -438,11 +417,11 @@ public class MongoFactoryTests(DatabaseFixture databaseFixture) : DatabaseTestBa
     }
 
     [Fact]
-    public async Task GetCollection_WithoutCollectionOptions_ShouldUseDefaultTimeSeriesOptions()
+    public async Task GetCollection_WithoutCollectionOptions_ShouldAllowAutoCreation()
     {
         // Arrange
         var connectionString = Fixture.GetConnectionString();
-        var uniqueCollectionName = $"DefaultOptionsCollection_{Guid.NewGuid():N}";
+        var uniqueCollectionName = $"AutoCreatedCollection_{Guid.NewGuid():N}";
         var options = new MongoSinkOptions
         {
             ConnectionString = connectionString,
@@ -458,10 +437,19 @@ public class MongoFactoryTests(DatabaseFixture databaseFixture) : DatabaseTestBa
         // Assert
         collection.Should().NotBeNull();
 
-        // Verify collection was created
+        // Verify collection was NOT created yet (auto-creation happens on first write)
         var database = collection.Database;
         var collectionList = await database.ListCollectionNamesAsync(cancellationToken: TestCancellation);
         var collections = await collectionList.ToListAsync(cancellationToken: TestCancellation);
+        collections.Should().NotContain(uniqueCollectionName);
+        
+        // Write to trigger auto-creation
+        var testDocument = new BsonDocument { { "test", "value" }, { "Timestamp", DateTime.UtcNow } };
+        await collection.InsertOneAsync(testDocument, cancellationToken: TestCancellation);
+        
+        // Now it should exist
+        collectionList = await database.ListCollectionNamesAsync(cancellationToken: TestCancellation);
+        collections = await collectionList.ToListAsync(cancellationToken: TestCancellation);
         collections.Should().Contain(uniqueCollectionName);
     }
 
