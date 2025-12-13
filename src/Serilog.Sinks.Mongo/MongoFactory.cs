@@ -38,7 +38,7 @@ public class MongoFactory : IMongoFactory
     /// <remarks>
     /// The client is created on first call and cached for subsequent calls.
     /// Uses double-checked locking to ensure thread-safe singleton behavior.
-    /// If neither <see cref="MongoSinkOptions.MongoUrl"/> nor <see cref="MongoSinkOptions.ConnectionString"/> 
+    /// If neither <see cref="MongoSinkOptions.MongoUrl"/> nor <see cref="MongoSinkOptions.ConnectionString"/>
     /// is specified, defaults to localhost:27017.
     /// </remarks>
     public ValueTask<IMongoClient> GetClient(MongoSinkOptions options)
@@ -171,46 +171,35 @@ public class MongoFactory : IMongoFactory
     /// </remarks>
     private static async Task EnsureCollectionIndexes(MongoSinkOptions options, IMongoCollection<BsonDocument> mongoCollection)
     {
-        var indexKeys = Builders<BsonDocument>.IndexKeys;
-
         var capped = options.CollectionOptions?.Capped == true;
-        var timeSeries = options.CollectionOptions?.TimeSeriesOptions != null;
 
         // TTL index not supported for capped collections
         var expireAfter = capped ? null : options.ExpireAfter;
 
-        var indexes = new List<CreateIndexModel<BsonDocument>>();
+        // only create index if ExpireAfter is set
+        if (expireAfter == null)
+            return;
 
+        // Get existing indexes
+        var existingIndexesCursor = await mongoCollection.Indexes.ListAsync();
+        var existingIndexes = await existingIndexesCursor.ToListAsync();
+        var existingIndexNames = existingIndexes
+            .Select(idx => idx.GetValue("name", BsonNull.Value).AsString)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .ToHashSet();
+
+        // Check if timestamp index exists
+        var timestampIndexName = $"{MongoSinkDefaults.Timestamp}_-1";
+        if (existingIndexNames.Contains(timestampIndexName))
+            return;
+
+        var indexKeys = Builders<BsonDocument>.IndexKeys;
         var timeIndex = new CreateIndexModel<BsonDocument>(
             keys: indexKeys.Descending(MongoSinkDefaults.Timestamp),
-            options: new CreateIndexOptions { ExpireAfter = expireAfter }
+            options: new CreateIndexOptions { Name = timestampIndexName, ExpireAfter = expireAfter }
         );
-        indexes.Add(timeIndex);
 
-        var levelIndex = new CreateIndexModel<BsonDocument>(
-            keys: indexKeys.Ascending(MongoSinkDefaults.Level)
-        );
-        indexes.Add(levelIndex);
-
-        // text indexes not supported for time-series collections
-        if (!timeSeries)
-        {
-            var messageIndex = new CreateIndexModel<BsonDocument>(
-                keys: indexKeys.Text(MongoSinkDefaults.Message)
-            );
-            indexes.Add(messageIndex);
-        }
-
-        var traceIndex = new CreateIndexModel<BsonDocument>(
-            keys: indexKeys.Ascending(MongoSinkDefaults.TraceId)
-        );
-        indexes.Add(traceIndex);
-
-        var spanIndex = new CreateIndexModel<BsonDocument>(
-            keys: indexKeys.Ascending(MongoSinkDefaults.SpanId)
-        );
-        indexes.Add(spanIndex);
-
-        await mongoCollection.Indexes.CreateManyAsync(indexes);
+        // Create the index
+        await mongoCollection.Indexes.CreateOneAsync(timeIndex);
     }
 }

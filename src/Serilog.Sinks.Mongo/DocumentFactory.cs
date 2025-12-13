@@ -54,10 +54,10 @@ public class DocumentFactory : IDocumentFactory
         };
 
         if (logEvent.TraceId != null)
-            document[MongoSinkDefaults.TraceId] = logEvent.TraceId.Value.ToHexString();
+            document[MongoSinkDefaults.TraceId] = new BsonString(logEvent.TraceId.Value.ToHexString());
 
         if (logEvent.SpanId != null)
-            document[MongoSinkDefaults.SpanId] = logEvent.SpanId.Value.ToHexString();
+            document[MongoSinkDefaults.SpanId] = new BsonString(logEvent.SpanId.Value.ToHexString());
 
         // promote configured properties to top-level
         PromoteProperties(logEvent, options, document);
