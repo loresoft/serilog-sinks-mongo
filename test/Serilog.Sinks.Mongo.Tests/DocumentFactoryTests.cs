@@ -1093,187 +1093,9 @@ public class DocumentFactoryTests
         props.Contains("RequestId").Should().BeTrue();
         props["RequestId"].AsString.Should().Be("abc-123");
         
-        // Promoted property should not be in Properties
-        props.Contains("UserId").Should().BeFalse();
-    }
-
-    [Fact]
-    public void CreateDocument_WithMultiplePromotedProperties_ShouldAddAllToTopLevel()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = ["UserId", "CorrelationId", "TenantId"]
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["UserId"] = new ScalarValue("12345"),
-            ["CorrelationId"] = new ScalarValue(Guid.NewGuid()),
-            ["TenantId"] = new ScalarValue("tenant-1"),
-            ["RequestId"] = new ScalarValue("request-123")
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeTrue();
-        document["UserId"].AsString.Should().Be("12345");
-        document.Contains("CorrelationId").Should().BeTrue();
-        document.Contains("TenantId").Should().BeTrue();
-        document["TenantId"].AsString.Should().Be("tenant-1");
-
-        // Non-promoted property should be in Properties
-        var props = document["Properties"].AsBsonDocument;
-        props.Contains("RequestId").Should().BeTrue();
-        
-        // Promoted properties should not be in Properties
-        props.Contains("UserId").Should().BeFalse();
-        props.Contains("CorrelationId").Should().BeFalse();
-        props.Contains("TenantId").Should().BeFalse();
-    }
-
-    [Fact]
-    public void CreateDocument_WithPromotedPropertyCaseInsensitive_ShouldMatch()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = ["userid"]  // lowercase
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["UserId"] = new ScalarValue("12345")  // mixed case
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeTrue();
-        document["UserId"].AsString.Should().Be("12345");
-        document.Contains("Properties").Should().BeFalse(); // No other properties
-    }
-
-    [Fact]
-    public void CreateDocument_WithPromotedPropertyNotInLogEvent_ShouldNotAddToDocument()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = ["UserId", "NonExistent"]
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["UserId"] = new ScalarValue("12345")
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeTrue();
-        document.Contains("NonExistent").Should().BeFalse();
-        document.Contains("Properties").Should().BeFalse(); // No remaining properties
-    }
-
-    [Fact]
-    public void CreateDocument_WithEmptyPropertiesCollection_ShouldNotPromoteAnything()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = []
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["UserId"] = new ScalarValue("12345"),
-            ["RequestId"] = new ScalarValue("abc-123")
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeFalse(); // Not at top level
-        document.Contains("RequestId").Should().BeFalse(); // Not at top level
-        
-        // All properties should be in Properties subdocument
-        var props = document["Properties"].AsBsonDocument;
+        // By default (OptimizeProperties = false), promoted property should also be in Properties (duplication)
         props.Contains("UserId").Should().BeTrue();
-        props.Contains("RequestId").Should().BeTrue();
-    }
-
-    [Fact]
-    public void CreateDocument_WithNullPropertiesCollection_ShouldNotPromoteAnything()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = null
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["UserId"] = new ScalarValue("12345"),
-            ["RequestId"] = new ScalarValue("abc-123")
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeFalse(); // Not at top level
-        document.Contains("RequestId").Should().BeFalse(); // Not at top level
-        
-        // All properties should be in Properties subdocument
-        var props = document["Properties"].AsBsonDocument;
-        props.Contains("UserId").Should().BeTrue();
-        props.Contains("RequestId").Should().BeTrue();
+        props["UserId"].AsString.Should().Be("12345");
     }
 
     [Fact]
@@ -1314,85 +1136,14 @@ public class DocumentFactoryTests
         user["Name"].AsString.Should().Be("John");
         user["Age"].AsInt32.Should().Be(30);
         
-        // Should not be in Properties subdocument
-        document.Contains("Properties").Should().BeFalse();
+        // By default (OptimizeProperties = false), promoted property should also be in Properties (duplication)
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("User").Should().BeTrue();
     }
 
     [Fact]
-    public void CreateDocument_WithPromotedArrayProperty_ShouldPreserveType()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = ["Tags"]
-        };
-
-        var sequence = new SequenceValue([
-            new ScalarValue("tag1"),
-            new ScalarValue("tag2"),
-            new ScalarValue("tag3")
-        ]);
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["Tags"] = sequence
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("Tags").Should().BeTrue();
-        document["Tags"].Should().BeOfType<BsonArray>();
-        
-        var tags = document["Tags"].AsBsonArray;
-        tags.Count.Should().Be(3);
-        tags[0].AsString.Should().Be("tag1");
-        tags[1].AsString.Should().Be("tag2");
-        tags[2].AsString.Should().Be("tag3");
-    }
-
-    [Fact]
-    public void CreateDocument_WithPromotedPropertyWithInvalidCharacters_ShouldSanitize()
-    {
-        // Arrange
-        var options = new MongoSinkOptions
-        {
-            Properties = ["User.Id"]
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["User.Id"] = new ScalarValue("12345")
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("User.Id").Should().BeFalse();
-        document.Contains("User_Id").Should().BeTrue();
-        document["User_Id"].AsString.Should().Be("12345");
-    }
-
-    [Fact]
-    public void CreateDocument_WithAllPropertiesPromoted_ShouldNotIncludePropertiesField()
+    public void CreateDocument_WithAllPropertiesPromoted_ShouldIncludePropertiesField()
     {
         // Arrange
         var options = new MongoSinkOptions
@@ -1418,11 +1169,18 @@ public class DocumentFactoryTests
 
         // Assert
         document.Should().NotBeNull();
-        document!.Contains("UserId").Should().BeTrue();
-        document.Contains("RequestId").Should().BeTrue();
         
-        // No Properties field should exist since all were promoted
-        document.Contains("Properties").Should().BeFalse();
+        // Promoted properties should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        document.Contains("RequestId").Should().BeTrue();
+        document["RequestId"].AsString.Should().Be("abc-123");
+        
+        // By default (OptimizeProperties = false), Properties field should exist with duplicates
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("UserId").Should().BeTrue();
+        props.Contains("RequestId").Should().BeTrue();
     }
 
     [Fact]
@@ -1454,7 +1212,10 @@ public class DocumentFactoryTests
         // RequestId should be in Properties
         var props = document["Properties"].AsBsonDocument;
         props.Contains("RequestId").Should().BeTrue();
-        props.Contains("SourceContext").Should().BeFalse();
+        props.Contains("SourceContext").Should().BeTrue();
+        
+        // By default (OptimizeProperties = false), SourceContext should also be in Properties (duplication)
+        props["SourceContext"].AsString.Should().Be("MyApp.Services.UserService");
     }
 
     [Fact]
@@ -1485,38 +1246,6 @@ public class DocumentFactoryTests
         document.Should().NotBeNull();
         document!.Contains("UserId").Should().BeTrue();
         document["UserId"].Should().BeOfType<BsonNull>();
-    }
-
-    [Fact]
-    public void CreateDocument_WithPromotedGuidProperty_ShouldConvertToBsonBinaryData()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var options = new MongoSinkOptions
-        {
-            Properties = ["CorrelationId"]
-        };
-
-        var properties = new Dictionary<string, LogEventPropertyValue>
-        {
-            ["CorrelationId"] = new ScalarValue(guid)
-        };
-
-        var logEvent = CreateLogEvent(
-            DateTimeOffset.UtcNow,
-            LogEventLevel.Information,
-            "Test",
-            properties: properties
-        );
-
-        // Act
-        var document = _factory.CreateDocument(logEvent, options);
-
-        // Assert
-        document.Should().NotBeNull();
-        document!.Contains("CorrelationId").Should().BeTrue();
-        document["CorrelationId"].Should().BeOfType<BsonBinaryData>();
-        document["CorrelationId"].AsBsonBinaryData.AsGuid.Should().Be(guid);
     }
 
     [Fact]
@@ -1551,6 +1280,566 @@ public class DocumentFactoryTests
         
         var actualTime = document["EventTime"].AsBsonDateTime.ToUniversalTime();
         (actualTime - dateTime).TotalMilliseconds.Should().BeLessThan(1);
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabled_ShouldRemovePromotedPropertiesFromPropertiesObject()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["UserId"],
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted property should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        
+        // Properties object should exist with non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        props["RequestId"].AsString.Should().Be("abc-123");
+        
+        // Promoted property should NOT be in Properties object
+        props.Contains("UserId").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesDisabled_ShouldKeepPromotedPropertiesInPropertiesObject()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["UserId"],
+            OptimizeProperties = false
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted property should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        
+        // Properties object should exist with all properties
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        props.Contains("UserId").Should().BeTrue();
+        props["RequestId"].AsString.Should().Be("abc-123");
+        props["UserId"].AsString.Should().Be("12345");
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndMultiplePromoted_ShouldRemoveAllPromotedProperties()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["UserId", "CorrelationId", "TenantId"],
+            OptimizeProperties = true
+        };
+
+        var guid = Guid.NewGuid();
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["CorrelationId"] = new ScalarValue(guid),
+            ["TenantId"] = new ScalarValue("tenant-1"),
+            ["RequestId"] = new ScalarValue("request-123"),
+            ["SessionId"] = new ScalarValue("session-456")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // All promoted properties should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        document.Contains("CorrelationId").Should().BeTrue();
+        document.Contains("TenantId").Should().BeTrue();
+        document["TenantId"].AsString.Should().Be("tenant-1");
+        
+        // Properties object should only contain non-promoted properties
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        props.Contains("SessionId").Should().BeTrue();
+        
+        // None of the promoted properties should be in Properties object
+        props.Contains("UserId").Should().BeFalse();
+        props.Contains("CorrelationId").Should().BeFalse();
+        props.Contains("TenantId").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndAllPropertiesPromoted_ShouldNotIncludePropertiesField()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["UserId", "RequestId"],
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted properties should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        document.Contains("RequestId").Should().BeTrue();
+        document["RequestId"].AsString.Should().Be("abc-123");
+        
+        // Properties field should NOT exist since all properties were promoted and removed
+        document.Contains("Properties").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesDefaultValue_ShouldKeepDuplicateProperties()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["UserId"]
+            // OptimizeProperties defaults to false
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted property should be at top level
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        
+        // Properties object should contain all properties including promoted one (duplication)
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("UserId").Should().BeTrue();
+        props.Contains("RequestId").Should().BeTrue();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndDefaultSourceContext_ShouldRemoveSourceContextFromProperties()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            // Default options has SourceContext in promoted properties
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["SourceContext"] = new ScalarValue("MyApp.Services.UserService"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // SourceContext should be promoted to top level
+        document!.Contains("SourceContext").Should().BeTrue();
+        document["SourceContext"].AsString.Should().Be("MyApp.Services.UserService");
+        
+        // Properties object should only contain non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        
+        // SourceContext should NOT be in Properties object
+        props.Contains("SourceContext").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndSanitizedPropertyName_ShouldRemoveCorrectly()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["User.Id"],  // Will be sanitized to "User_Id"
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["User.Id"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted property should be at top level with sanitized name
+        document!.Contains("User_Id").Should().BeTrue();
+        document["User_Id"].AsString.Should().Be("12345");
+        
+        // Properties object should only contain non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        
+        // Original property name should NOT be in Properties object
+        props.Contains("User.Id").Should().BeFalse();
+        props.Contains("User_Id").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledCaseInsensitive_ShouldRemoveCorrectly()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["userid", "REQUESTID"],  // Different casing
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123"),
+            ["SessionId"] = new ScalarValue("session-456")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted properties should be at top level (preserving original casing)
+        document!.Contains("UserId").Should().BeTrue();
+        document["UserId"].AsString.Should().Be("12345");
+        document.Contains("RequestId").Should().BeTrue();
+        document["RequestId"].AsString.Should().Be("abc-123");
+        
+        // Properties object should only contain non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("SessionId").Should().BeTrue();
+        
+        // Promoted properties should NOT be in Properties (case-insensitive matching)
+        props.Contains("UserId").Should().BeFalse();
+        props.Contains("RequestId").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndComplexProperty_ShouldRemoveFromProperties()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["User"],
+            OptimizeProperties = true
+        };
+
+        var structure = new StructureValue([
+            new LogEventProperty("Name", new ScalarValue("John")),
+            new LogEventProperty("Age", new ScalarValue(30))
+        ]);
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["User"] = structure,
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted complex property should be at top level
+        document!.Contains("User").Should().BeTrue();
+        document["User"].Should().BeOfType<BsonDocument>();
+        var user = document["User"].AsBsonDocument;
+        user["Name"].AsString.Should().Be("John");
+        user["Age"].AsInt32.Should().Be(30);
+        
+        // Properties object should only contain non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        
+        // Promoted property should NOT be in Properties object
+        props.Contains("User").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndArrayProperty_ShouldRemoveFromProperties()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["Tags"],
+            OptimizeProperties = true
+        };
+
+        var sequence = new SequenceValue([
+            new ScalarValue("tag1"),
+            new ScalarValue("tag2"),
+            new ScalarValue("tag3")
+        ]);
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["Tags"] = sequence,
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // Promoted array property should be at top level
+        document!.Contains("Tags").Should().BeTrue();
+        document["Tags"].Should().BeOfType<BsonArray>();
+        var tags = document["Tags"].AsBsonArray;
+        tags.Count.Should().Be(3);
+        
+        // Properties object should only contain non-promoted property
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("RequestId").Should().BeTrue();
+        
+        // Promoted property should NOT be in Properties object
+        props.Contains("Tags").Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndNoMatchingProperties_ShouldKeepPropertiesUnchanged()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = ["NonExistent"],
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // No properties should be promoted to top level
+        document!.Contains("NonExistent").Should().BeFalse();
+        document.Contains("UserId").Should().BeFalse();
+        document.Contains("RequestId").Should().BeFalse();
+        
+        // All properties should remain in Properties object
+        document.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("UserId").Should().BeTrue();
+        props.Contains("RequestId").Should().BeTrue();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndNullPropertiesCollection_ShouldNotThrow()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = null,
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // All properties should remain in Properties object
+        document!.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("UserId").Should().BeTrue();
+        props.Contains("RequestId").Should().BeTrue();
+    }
+
+    [Fact]
+    public void CreateDocument_WithOptimizePropertiesEnabledAndEmptyPropertiesCollection_ShouldNotRemoveAnything()
+    {
+        // Arrange
+        var options = new MongoSinkOptions
+        {
+            Properties = [],
+            OptimizeProperties = true
+        };
+
+        var properties = new Dictionary<string, LogEventPropertyValue>
+        {
+            ["UserId"] = new ScalarValue("12345"),
+            ["RequestId"] = new ScalarValue("abc-123")
+        };
+
+        var logEvent = CreateLogEvent(
+            DateTimeOffset.UtcNow,
+            LogEventLevel.Information,
+            "Test",
+            properties: properties
+        );
+
+        // Act
+        var document = _factory.CreateDocument(logEvent, options);
+
+        // Assert
+        document.Should().NotBeNull();
+        
+        // All properties should remain in Properties object
+        document!.Contains("Properties").Should().BeTrue();
+        var props = document["Properties"].AsBsonDocument;
+        props.Contains("UserId").Should().BeTrue();
+        props.Contains("RequestId").Should().BeTrue();
     }
 
     private static LogEvent CreateLogEvent(

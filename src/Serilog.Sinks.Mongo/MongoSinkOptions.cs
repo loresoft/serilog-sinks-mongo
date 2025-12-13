@@ -1,6 +1,7 @@
 using MongoDB.Driver;
 
 using Serilog.Configuration;
+using Serilog.Core;
 using Serilog.Events;
 
 namespace Serilog.Sinks.Mongo;
@@ -16,6 +17,16 @@ public class MongoSinkOptions : BatchingOptions
     /// </summary>
     /// <value>The minimum log level. Defaults to <see cref="LevelAlias.Minimum"/> (Verbose).</value>
     public LogEventLevel MinimumLevel { get; set; } = LevelAlias.Minimum;
+
+    /// <summary>
+    /// Gets or sets the <see cref="LoggingLevelSwitch"/> that dynamically controls the log event level
+    /// required to write an event to the sink.
+    /// </summary>
+    /// <value>
+    /// The <see cref="LoggingLevelSwitch"/> instance, allowing runtime adjustments to the filtering level.
+    /// If null, the level is determined by the <see cref="MinimumLevel"/> property.
+    /// </value>
+    public LoggingLevelSwitch? LevelSwitch { get; set; }
 
     /// <summary>
     /// Gets or sets the MongoDB connection string.
@@ -87,4 +98,16 @@ public class MongoSinkOptions : BatchingOptions
     /// Implement <see cref="IMongoFactory"/> to customize MongoDB connection and resource management.
     /// </remarks>
     public IMongoFactory? MongoFactory { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to remove promoted properties from the nested Properties object.
+    /// </summary>
+    /// <value><c>true</c> to remove promoted properties from the Properties collection; otherwise, <c>false</c>. Defaults to <c>false</c>.</value>
+    /// <remarks>
+    /// Properties specified in <see cref="Properties"/> are always promoted to top-level fields in the MongoDB document.
+    /// When this option is enabled, those promoted properties are also removed from the nested Properties object,
+    /// reducing document size and avoiding duplication.
+    /// When disabled, promoted properties appear both at the top level and within the Properties object.
+    /// </remarks>
+    public bool OptimizeProperties { get; set; }
 }

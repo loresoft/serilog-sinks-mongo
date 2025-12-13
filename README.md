@@ -137,6 +137,9 @@ Log.Logger = new LoggerConfiguration()
             "RequestId",
             "UserId"
         };
+        
+        // Remove promoted properties from nested Properties object
+        options.OptimizeProperties = true;
     })
     .CreateLogger();
 ```
@@ -189,20 +192,22 @@ Log.Logger = new LoggerConfiguration()
 
 ### MongoSinkOptions
 
-| Property             | Default             | Description                                 |
-| -------------------- | ------------------- | ------------------------------------------- |
-| `ConnectionString`   | -                   | MongoDB connection string                   |
-| `MongoUrl`           | -                   | Alternative to ConnectionString             |
-| `DatabaseName`       | `"serilog"`         | Database name                               |
-| `CollectionName`     | `"logs"`            | Collection name                             |
-| `MinimumLevel`       | `Verbose`           | Minimum log level to write                  |
-| `ExpireAfter`        | -                   | TTL for automatic document expiration       |
-| `BatchSizeLimit`     | `100`               | Maximum batch size                          |
-| `BufferingTimeLimit` | `00:00:02`          | Maximum time to wait before writing a batch |
-| `CollectionOptions`  | -                   | MongoDB collection creation options         |
-| `Properties`         | `{"SourceContext"}` | Properties to promote to top-level          |
-| `DocumentFactory`    | -                   | Custom document factory                     |
-| `MongoFactory`       | -                   | Custom MongoDB factory                      |
+| Property             | Default             | Description                                                                      |
+| -------------------- | ------------------- | -------------------------------------------------------------------------------- |
+| `ConnectionString`   | `null`              | MongoDB connection string                                                        |
+| `MongoUrl`           | `null`              | Alternative to ConnectionString (takes precedence if both are set)               |
+| `DatabaseName`       | `"serilog"`         | Database name                                                                    |
+| `CollectionName`     | `"logs"`            | Collection name                                                                  |
+| `MinimumLevel`       | `Verbose`           | Minimum log event level to write                                                 |
+| `LevelSwitch`        | `null`              | Dynamically controls the minimum log level at runtime                            |
+| `ExpireAfter`        | `null`              | Time-to-live for automatic document expiration (creates TTL index on Timestamp)  |
+| `BatchSizeLimit`     | `100`               | Maximum number of events to include in a single batch                            |
+| `BufferingTimeLimit` | `00:00:02`          | Maximum time to wait before writing a batch                                      |
+| `CollectionOptions`  | `null`              | MongoDB collection creation options (capped collections, time-series, etc.)      |
+| `Properties`         | `{"SourceContext"}` | Property names to promote from Properties object to document top-level           |
+| `OptimizeProperties` | `false`             | Remove promoted properties from nested Properties object to avoid duplication    |
+| `DocumentFactory`    | `null`              | Custom document factory for converting log events to BSON                        |
+| `MongoFactory`       | `null`              | Custom MongoDB factory for client/database/collection management                 |
 
 ## Document Structure
 
@@ -262,6 +267,17 @@ This results in:
   }
 }
 ```
+
+#### Optimizing Property Storage
+
+By default, promoted properties appear both at the top level and within the nested `Properties` object. To reduce document size and avoid duplication, enable `OptimizeProperties`:
+
+```csharp
+options.Properties = new HashSet<string> { "SourceContext", "RequestId", "UserId" };
+options.OptimizeProperties = true; // Removes promoted properties from nested Properties
+```
+
+With `OptimizeProperties` enabled, promoted properties are removed from the `Properties` object after being promoted to the top level.
 
 ## Custom Document Factory
 

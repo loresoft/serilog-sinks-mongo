@@ -66,7 +66,10 @@ public class DocumentFactory : IDocumentFactory
         if (exceptionDocument != null)
             document[MongoSinkDefaults.Exception] = exceptionDocument;
 
-        var propertyDocument = CreateProperties(logEvent.Properties, options.Properties);
+        // remove promoted properties from the Properties document if enabled
+        var ignored = options.OptimizeProperties ? options.Properties : null;
+
+        var propertyDocument = CreateProperties(logEvent.Properties, ignored);
         if (propertyDocument != null)
             document[MongoSinkDefaults.Properties] = propertyDocument;
 

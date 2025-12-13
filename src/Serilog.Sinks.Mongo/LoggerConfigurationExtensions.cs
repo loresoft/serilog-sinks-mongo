@@ -1,6 +1,7 @@
 using MongoDB.Driver;
 
 using Serilog.Configuration;
+using Serilog.Core;
 using Serilog.Events;
 
 namespace Serilog.Sinks.Mongo;
@@ -48,7 +49,11 @@ public static class LoggerConfigurationExtensions
 
         var sink = new MongoSink(options);
 
-        return loggerConfiguration.Sink(sink, options, options.MinimumLevel);
+        return loggerConfiguration.Sink(
+            batchedLogEventSink: sink,
+            batchingOptions: options,
+            restrictedToMinimumLevel: options.MinimumLevel,
+            levelSwitch: options.LevelSwitch);
     }
 
     /// <summary>
@@ -65,6 +70,9 @@ public static class LoggerConfigurationExtensions
     /// <param name="batchSizeLimit">Optional maximum number of events to include in a single batch.</param>
     /// <param name="bufferingTimeLimit">Optional maximum time to wait before writing a batch.</param>
     /// <param name="documentFactory">Optional custom document factory for converting log events to BSON.</param>
+    /// <param name="levelSwitch">Optional logging level switch for dynamic log level control.</param>
+    /// <param name="properties">Optional list of properties to include in the log documents.</param>
+    /// <param name="optimizeProperties">If set to <c>true</c>, optimizes the storage of properties in the log documents.</param>
     /// <returns>The logger configuration for method chaining.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="loggerConfiguration"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="connectionString"/> is <c>null</c> or empty.</exception>
@@ -96,7 +104,10 @@ public static class LoggerConfigurationExtensions
         long? maxSize = null,
         int? batchSizeLimit = null,
         TimeSpan? bufferingTimeLimit = null,
-        IDocumentFactory? documentFactory = null)
+        IDocumentFactory? documentFactory = null,
+        LoggingLevelSwitch? levelSwitch = null,
+        string[]? properties = null,
+        bool optimizeProperties = false)
     {
         if (loggerConfiguration is null)
             throw new ArgumentNullException(nameof(loggerConfiguration));
@@ -117,7 +128,10 @@ public static class LoggerConfigurationExtensions
             maxSize,
             batchSizeLimit,
             bufferingTimeLimit,
-            documentFactory
+            documentFactory,
+            levelSwitch,
+            properties,
+            optimizeProperties
         );
     }
 
@@ -135,6 +149,9 @@ public static class LoggerConfigurationExtensions
     /// <param name="batchSizeLimit">Optional maximum number of events to include in a single batch.</param>
     /// <param name="bufferingTimeLimit">Optional maximum time to wait before writing a batch.</param>
     /// <param name="documentFactory">Optional custom document factory for converting log events to BSON.</param>
+    /// <param name="levelSwitch">Optional logging level switch for dynamic log level control.</param>
+    /// <param name="properties">Optional list of properties to include in the log documents.</param>
+    /// <param name="optimizeProperties">If set to <c>true</c>, optimizes the storage of properties in the log documents.</param>
     /// <returns>The logger configuration for method chaining.</returns>
     /// <exception cref="ArgumentNullException">
     /// Thrown when <paramref name="loggerConfiguration"/> or <paramref name="mongoUrl"/> is <c>null</c>.
@@ -167,7 +184,10 @@ public static class LoggerConfigurationExtensions
         long? maxSize = null,
         int? batchSizeLimit = null,
         TimeSpan? bufferingTimeLimit = null,
-        IDocumentFactory? documentFactory = null)
+        IDocumentFactory? documentFactory = null,
+        LoggingLevelSwitch? levelSwitch = null,
+        string[]? properties = null,
+        bool optimizeProperties = false)
     {
         if (loggerConfiguration is null)
             throw new ArgumentNullException(nameof(loggerConfiguration));
@@ -189,6 +209,12 @@ public static class LoggerConfigurationExtensions
             sinkOptions.CollectionName = collectionName;
             sinkOptions.MinimumLevel = minimumLevel;
             sinkOptions.CollectionOptions = collectionOptions;
+            sinkOptions.LevelSwitch = levelSwitch;
+            sinkOptions.ExpireAfter = expireAfter;
+            sinkOptions.OptimizeProperties = optimizeProperties;
+
+            if (properties != null)
+                sinkOptions.Properties = [.. properties];
 
             if (batchSizeLimit.HasValue)
                 sinkOptions.BatchSizeLimit = batchSizeLimit.Value;
