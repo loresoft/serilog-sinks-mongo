@@ -144,6 +144,10 @@ public class MongoFactory : IMongoFactory
     /// </remarks>
     private static async Task EnsureCollectionExists(MongoSinkOptions options, IMongoDatabase database, IMongoCollection<BsonDocument> collection)
     {
+        // If no collection options specified, assume auto-creation is sufficient
+        if (options.CollectionOptions == null)
+            return;
+
         try
         {
             var collectionList = await database.ListCollectionNamesAsync();
