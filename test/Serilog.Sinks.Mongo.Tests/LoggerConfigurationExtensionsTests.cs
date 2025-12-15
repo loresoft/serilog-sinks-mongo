@@ -169,6 +169,43 @@ public class LoggerConfigurationExtensionsTests(DatabaseFixture databaseFixture)
         count.Should().BeGreaterThan(0);
     }
 
+    [Fact]
+    public async Task MongoDB_WithConfigureActionNoDatabaseName_UsesDatabaseNameFromConnectionString()
+    {
+        // Arrange
+        var databaseNameInConnectionString = "DatabaseFromConnectionString";
+        var collectionName = $"logs_{Guid.NewGuid():N}";
+
+        // Create a connection string with a specific database name
+        var mongoUrlBuilder = new MongoUrlBuilder(Fixture.GetConnectionString())
+        {
+            DatabaseName = databaseNameInConnectionString
+        };
+        var connectionStringWithDb = mongoUrlBuilder.ToString();
+
+        var logger = new LoggerConfiguration()
+            .WriteTo.MongoDB(options =>
+            {
+                options.ConnectionString = connectionStringWithDb;
+                options.CollectionName = collectionName;
+            })
+            .CreateLogger();
+
+        // Act
+        logger.Information("Test message with database from ConnectionString in options");
+
+        await Task.Delay(200, cancellationToken: TestCancellation);
+        logger.Dispose();
+
+        // Assert - Verify the log was written to the database specified in ConnectionString
+        var mongoClient = new MongoClient(connectionStringWithDb);
+        var database = mongoClient.GetDatabase(databaseNameInConnectionString);
+        var collection = database.GetCollection<BsonDocument>(collectionName);
+
+        var count = await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: TestCancellation);
+        count.Should().BeGreaterThan(0);
+    }
+
     #endregion
 
     #region MongoDB with ConnectionString overload

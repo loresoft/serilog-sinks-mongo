@@ -51,9 +51,10 @@ public class MongoFactory : IMongoFactory
             if (_mongoClient != null)
                 return new ValueTask<IMongoClient>(_mongoClient);
 
-            var mongoUrl = options.MongoUrl ?? new MongoUrl(options.ConnectionString ?? MongoSinkDefaults.ConnectionString);
+            // set MongoUrl if not already set, used later for database name too
+            options.MongoUrl ??= new MongoUrl(options.ConnectionString ?? MongoSinkDefaults.ConnectionString);
 
-            _mongoClient = new MongoClient(mongoUrl);
+            _mongoClient = new MongoClient(options.MongoUrl);
             return new ValueTask<IMongoClient>(_mongoClient);
         }
     }
