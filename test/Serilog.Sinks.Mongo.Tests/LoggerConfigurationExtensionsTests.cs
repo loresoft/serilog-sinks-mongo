@@ -132,6 +132,43 @@ public class LoggerConfigurationExtensionsTests(DatabaseFixture databaseFixture)
         documents.Should().OnlyContain(d => d["Level"].AsString == "Warning" || d["Level"].AsString == "Error");
     }
 
+    [Fact]
+    public async Task MongoDB_WithConfigureActionNoDatabaseName_UsesDatabaseNameFromMongoUrl()
+    {
+        // Arrange
+        var databaseNameInUrl = "DatabaseFromConfigAction";
+        var collectionName = $"logs_{Guid.NewGuid():N}";
+
+        // Create a MongoUrl with a specific database name
+        var mongoUrlBuilder = new MongoUrlBuilder(Fixture.GetConnectionString())
+        {
+            DatabaseName = databaseNameInUrl
+        };
+        var mongoUrl = mongoUrlBuilder.ToMongoUrl();
+
+        var logger = new LoggerConfiguration()
+            .WriteTo.MongoDB(options =>
+            {
+                options.MongoUrl = mongoUrl;
+                options.CollectionName = collectionName;
+            })
+            .CreateLogger();
+
+        // Act
+        logger.Information("Test message with database from MongoUrl in options");
+
+        await Task.Delay(200, cancellationToken: TestCancellation);
+        logger.Dispose();
+
+        // Assert - Verify the log was written to the database specified in MongoUrl
+        var mongoClient = new MongoClient(mongoUrl);
+        var database = mongoClient.GetDatabase(databaseNameInUrl);
+        var collection = database.GetCollection<BsonDocument>(collectionName);
+
+        var count = await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: TestCancellation);
+        count.Should().BeGreaterThan(0);
+    }
+
     #endregion
 
     #region MongoDB with ConnectionString overload
@@ -594,6 +631,42 @@ public class LoggerConfigurationExtensionsTests(DatabaseFixture databaseFixture)
 
         var factory = new MongoFactory();
         var collection = await factory.GetCollection(mongoOptions);
+        var count = await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: TestCancellation);
+        count.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task MongoDB_WithMongoUrlNoDatabaseNameParameter_UsesDatabaseNameFromMongoUrl()
+    {
+        // Arrange
+        var databaseNameInUrl = "DatabaseFromUrl";
+        var collectionName = $"logs_{Guid.NewGuid():N}";
+
+        // Create a MongoUrl with a specific database name
+        var mongoUrlBuilder = new MongoUrlBuilder(Fixture.GetConnectionString())
+        {
+            DatabaseName = databaseNameInUrl
+        };
+        var mongoUrl = mongoUrlBuilder.ToMongoUrl();
+
+        var logger = new LoggerConfiguration()
+            .WriteTo.MongoDB(
+                mongoUrl,
+                collectionName: collectionName
+            )
+            .CreateLogger();
+
+        // Act
+        logger.Information("Test message with database from MongoUrl");
+
+        await Task.Delay(200, cancellationToken: TestCancellation);
+        logger.Dispose();
+
+        // Assert - Verify the log was written to the database specified in MongoUrl
+        var mongoClient = new MongoClient(mongoUrl);
+        var database = mongoClient.GetDatabase(databaseNameInUrl);
+        var collection = database.GetCollection<BsonDocument>(collectionName);
+
         var count = await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: TestCancellation);
         count.Should().BeGreaterThan(0);
     }

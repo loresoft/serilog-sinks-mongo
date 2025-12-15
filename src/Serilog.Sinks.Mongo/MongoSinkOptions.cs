@@ -38,13 +38,13 @@ public class MongoSinkOptions : BatchingOptions
     /// Gets or sets the name of the MongoDB database to store log events.
     /// </summary>
     /// <value>The database name. Defaults to "serilog".</value>
-    public string? DatabaseName { get; set; } = MongoSinkDefaults.DatabaseName;
+    public string? DatabaseName { get; set; }
 
     /// <summary>
     /// Gets or sets the name of the MongoDB collection to store log events.
     /// </summary>
     /// <value>The collection name. Defaults to "logs".</value>
-    public string? CollectionName { get; set; } = MongoSinkDefaults.CollectionName;
+    public string? CollectionName { get; set; }
 
     /// <summary>
     /// Gets or sets the MongoDB URL as an alternative to <see cref="ConnectionString"/>.

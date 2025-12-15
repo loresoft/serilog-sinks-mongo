@@ -96,8 +96,8 @@ public static class LoggerConfigurationExtensions
     public static LoggerConfiguration MongoDB(
         this LoggerSinkConfiguration loggerConfiguration,
         string connectionString,
-        string databaseName = MongoSinkDefaults.DatabaseName,
-        string collectionName = MongoSinkDefaults.CollectionName,
+        string? databaseName = null,
+        string? collectionName = null,
         LogEventLevel minimumLevel = LevelAlias.Minimum,
         TimeSpan? expireAfter = null,
         long? maxDocuments = null,
@@ -176,8 +176,8 @@ public static class LoggerConfigurationExtensions
     public static LoggerConfiguration MongoDB(
         this LoggerSinkConfiguration loggerConfiguration,
         MongoUrl mongoUrl,
-        string databaseName = MongoSinkDefaults.DatabaseName,
-        string collectionName = MongoSinkDefaults.CollectionName,
+        string? databaseName = null,
+        string? collectionName = null,
         LogEventLevel minimumLevel = LevelAlias.Minimum,
         TimeSpan? expireAfter = null,
         long? maxDocuments = null,
@@ -201,6 +201,9 @@ public static class LoggerConfigurationExtensions
             MaxSize = maxSize,
             MaxDocuments = maxDocuments
         };
+
+        // default database name from mongoUrl if not provided
+        databaseName ??= mongoUrl.DatabaseName ?? MongoSinkDefaults.DatabaseName;
 
         return MongoDB(loggerConfiguration, sinkOptions =>
         {

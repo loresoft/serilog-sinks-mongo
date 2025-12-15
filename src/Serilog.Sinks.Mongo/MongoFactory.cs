@@ -81,7 +81,7 @@ public class MongoFactory : IMongoFactory
             if (_mongoDatabase != null)
                 return _mongoDatabase;
 
-            var databaseName = options.DatabaseName ?? MongoSinkDefaults.DatabaseName;
+            var databaseName = options.DatabaseName ?? options.MongoUrl?.DatabaseName ?? MongoSinkDefaults.DatabaseName;
             _mongoDatabase = client.GetDatabase(databaseName);
         }
 
